@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">auth0-capacitor-custom-cache</string>
+    <string name="title_activity_main">auth0-capacitor-custom-cache</string>
+    <string name="package_name">io.github.githubjakob.auth0capacitorcustomcache</string>
+    <string name="custom_url_scheme">io.github.githubjakob.auth0capacitorcustomcache</string>
+</resources>
