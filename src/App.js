@@ -1,6 +1,5 @@
 import { Auth0Client } from '@auth0/auth0-spa-js';
 import { Browser } from '@capacitor/browser';
-import './App.css';
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {Capacitor} from "@capacitor/core";
 import { App } from '@capacitor/app';
@@ -33,6 +32,10 @@ const getLocalStorageCache = () => {
 
 
 const getSqLiteStorageCache = () => {
+  if (!Capacitor.isNativePlatform()) {
+    return undefined;
+  }
+
   const auth0KeyIdentifier = '@@auth0spajs@@';
 
   const sqlLiteStorageEngine = SQLiteStorage(
