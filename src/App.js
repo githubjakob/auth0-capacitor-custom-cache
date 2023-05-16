@@ -138,9 +138,6 @@ function Application() {
     }
   }, [checkLogin]);
 
-
-
-
   useEffect(() => {
     const addListener = async () => {
       console.log("### addlistner")
