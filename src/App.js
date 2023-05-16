@@ -4,6 +4,68 @@ import './App.css';
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {Capacitor} from "@capacitor/core";
 import { App } from '@capacitor/app';
+import SQLiteStorage from 'redux-persist-sqlite-storage';
+
+
+const getLocalStorageCache = () => {
+  return {
+    get(key) {
+      console.log("# get", key)
+      const value = localStorage.getItem(key)
+      return JSON.parse(value);
+    },
+    set(key, value) {
+      console.log("# set", key)
+      localStorage.setItem(key, JSON.stringify(value));
+    },
+    remove(key) {
+      console.log("# remove", key)
+      localStorage.removeItem(key);
+    },
+    clear() {
+      localStorage.clear()
+    },
+    allKeys() {
+      return Object.keys(localStorage)
+    },
+  }
+}
+
+
+const getSqLiteStorageCache = () => {
+  const auth0KeyIdentifier = '@@auth0spajs@@';
+
+  const sqlLiteStorageEngine = SQLiteStorage(
+      window.sqlitePlugin,
+      { androidDatabaseProvider: 'system' },
+  );
+  return {
+    async get(key) {
+      console.log("# get", key)
+      const value = await sqlLiteStorageEngine.getItem(key);
+      return JSON.parse(value);
+    },
+    async set(key, value) {
+      console.log("# set", key)
+      await sqlLiteStorageEngine.setItem(key, JSON.stringify(value));
+    },
+    async remove(key) {
+      console.log("# remove", key)
+      await sqlLiteStorageEngine.removeItem(key);
+    },
+    async clear() {
+      const auth0Keys = await this._getAuth0Keys();
+      return Promise.all(auth0Keys.map(async key => sqlLiteStorageEngine.removeItem(key)));
+    },
+    async allKeys() {
+      return this._getAuth0Keys();
+    },
+    async _getAuth0Keys() {
+      const allStoreKeys = await sqlLiteStorageEngine.getAllKeys();
+      return allStoreKeys.filter(key => key.includes(auth0KeyIdentifier));
+    },
+  }
+}
 
 function Application() {
 
@@ -20,30 +82,34 @@ function Application() {
       clientId: process.env.REACT_APP_AUTH0_CLIENT_ID,
       useRefreshTokens: true,
       useRefreshTokensFallback: false,
+      cache: getSqLiteStorageCache(),
       authorizationParams: {
         redirect_uri: isNative ? redirectUri : window.location.origin,
         audience: process.env.REACT_APP_AUTH0_AUDIENCE,
       }
     });
-  }, [redirectUri, isNative])
+  }, [domain, redirectUri, isNative])
 
   const login = useCallback(async () => {
     await auth0.loginWithRedirect({
       async openUrl(url) {
+        console.log("Open url", url)
+        console.log("Redirect uri", redirectUri)
         await Browser.open({
           url,
           windowName: '_self',
         });
       },
       authorizationParams: {
-        theme: "agent",
+        theme: "agent", // custom param needed for our universal login page
         // prompt: 'login'
       }
     });
-  }, [auth0])
+  }, [redirectUri, auth0])
 
 
   const checkLogin = useCallback(async (url = window.location.href) => {
+    console.log("### checkLogin", url)
     try {
       await auth0.handleRedirectCallback(url);
     } catch (e) {
@@ -52,18 +118,25 @@ function Application() {
     await auth0.getTokenSilently({
       cacheMode: 'off',
       authorizationParams: {
-        appVariantIdentifier: 'agent'
+        appVariantIdentifier: 'agent' // custom param
       }
     });
     const {email} = await auth0.getIdTokenClaims()
     setEmail(email)
-  }, [])
+  }, [auth0])
 
   const appUrlOpen = useCallback(async ({url}) => {
     console.log("### url", url)
     await checkLogin(url)
-    await Browser.close()
-  }, []);
+    try {
+      await Browser.close()
+    } catch (e) {
+      // somehow android throws this error but still works
+      if (e.message !== 'not implemented') {
+        throw e
+      }
+    }
+  }, [checkLogin]);
 
 
 
@@ -86,7 +159,7 @@ function Application() {
     return () => {
       removeListener()
     };
-  }, [auth0]);
+  }, [isNative, checkLogin, appUrlOpen, auth0]);
 
 
   return (
